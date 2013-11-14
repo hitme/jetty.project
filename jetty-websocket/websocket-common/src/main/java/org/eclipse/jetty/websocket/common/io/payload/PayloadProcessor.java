@@ -33,10 +33,12 @@ public interface PayloadProcessor
      * 
      * @param payload
      *            the payload to process
+     * @param destination
+     *            the buffer into which to put the processed payload
      * @throws BadPayloadException
      *             the exception when the payload fails to validate properly
      */
-    public void process(ByteBuffer payload);
+    public void process(ByteBuffer payload,ByteBuffer destination);
 
     public void reset(Frame frame);
 }

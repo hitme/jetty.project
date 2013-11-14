@@ -56,7 +56,7 @@ public class DeMaskProcessorTest
 
         DeMaskProcessor demask = new DeMaskProcessor();
         demask.reset(frame);
-        demask.process(payload);
+        demask.process(payload,payload);
 
         ByteBufferAssert.assertEquals("DeMasked Text Payload",message,payload);
     }
@@ -95,8 +95,8 @@ public class DeMaskProcessorTest
 
         Assert.assertThat("Slices are setup right",slice1.remaining() + slice2.remaining(),is(messageSize));
 
-        demask.process(slice1);
-        demask.process(slice2);
+        demask.process(slice1,slice1);
+        demask.process(slice2,slice2);
         
         LOG.debug("Post-Processed: {}",Hex.asHex(payload));
 

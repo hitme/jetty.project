@@ -51,7 +51,6 @@ public class Parser
     private enum State
     {
         START,
-        FINOP,
         PAYLOAD_LEN,
         PAYLOAD_LEN_BYTES,
         MASK,
@@ -131,7 +130,7 @@ public class Parser
     }
 
     public void configureFromExtensions(List<? extends Extension> exts)
-    {
+    {        
         // default
         this.rsv1InUse = false;
         this.rsv2InUse = false;
@@ -294,18 +293,11 @@ public class Parser
                     {
                         frame.reset();
                     }
-
-                    state = State.FINOP;
-                    break;
-                }
-                case FINOP:
-                {
+                    
                     // peek at byte
                     byte b = buffer.get();
                     boolean fin = ((b & 0x80) != 0);
-                    boolean rsv1 = ((b & 0x40) != 0);
-                    boolean rsv2 = ((b & 0x20) != 0);
-                    boolean rsv3 = ((b & 0x10) != 0);
+                    
                     byte opc = (byte)(b & 0x0F);
                     byte opcode = opc;
 
@@ -313,37 +305,14 @@ public class Parser
                     {
                         throw new ProtocolException("Unknown opcode: " + opc);
                     }
-
-                    if (LOG.isDebugEnabled())
-                    {
-                        LOG.debug("OpCode {}, fin={} rsv={}{}{}",OpCode.name(opcode),fin,(rsv1?'1':'.'),(rsv2?'1':'.'),(rsv3?'1':'.'));
-                    }
-
-                    /*
-                     * RFC 6455 Section 5.2
-                     * 
-                     * MUST be 0 unless an extension is negotiated that defines meanings for non-zero values. If a nonzero value is received and none of the
-                     * negotiated extensions defines the meaning of such a nonzero value, the receiving endpoint MUST _Fail the WebSocket Connection_.
-                     */
-                    if (!rsv1InUse && rsv1)
-                    {
-                        throw new ProtocolException("RSV1 not allowed to be set");
-                    }
-
-                    if (!rsv2InUse && rsv2)
-                    {
-                        throw new ProtocolException("RSV2 not allowed to be set");
-                    }
-
-                    if (!rsv3InUse && rsv3)
-                    {
-                        throw new ProtocolException("RSV3 not allowed to be set");
-                    }
+                    
 
                     // base framing flags
-                    switch(opcode) {
+                    switch(opcode) 
+                    {
                         case OpCode.TEXT:
                             frame = new TextFrame();
+                            lastDataOpcode = opcode;
                             // data validation
                             if ((priorDataFrame != null) && (!priorDataFrame.isFin()))
                             {
@@ -352,6 +321,7 @@ public class Parser
                             break;
                         case OpCode.BINARY:
                             frame = new BinaryFrame();
+                            lastDataOpcode = opcode;
                             // data validation
                             if ((priorDataFrame != null) && (!priorDataFrame.isFin()))
                             {
@@ -360,6 +330,7 @@ public class Parser
                             break;
                         case OpCode.CONTINUATION:
                             frame = new ContinuationFrame();
+                            lastDataOpcode = opcode;
                             // continuation validation
                             if (priorDataFrame == null)
                             {
@@ -395,18 +366,50 @@ public class Parser
                     }
                     
                     frame.setFin(fin);
-                    frame.setRsv1(rsv1);
-                    frame.setRsv2(rsv2);
-                    frame.setRsv3(rsv3);
 
-                    if (frame.isDataFrame())
+                    // Are any flags set?
+                    if ((b & 0x70) != 0)
                     {
-                        lastDataOpcode = opcode;
+                        /*
+                         * RFC 6455 Section 5.2
+                         * 
+                         * MUST be 0 unless an extension is negotiated that defines meanings for non-zero values. If a nonzero value is received and none of the
+                         * negotiated extensions defines the meaning of such a nonzero value, the receiving endpoint MUST _Fail the WebSocket Connection_.
+                         */
+                        if ((b & 0x40) != 0)
+                        {
+                            if (rsv1InUse)
+                                frame.setRsv1(true);
+                            else
+                                throw new ProtocolException("RSV1 not allowed to be set");   
+                        }
+                        if ((b & 0x20) != 0)
+                        {
+                            if (rsv2InUse)
+                                frame.setRsv2(true);
+                            else
+                                throw new ProtocolException("RSV2 not allowed to be set");   
+                        }
+                        if ((b & 0x10) != 0)
+                        {
+                            if (rsv3InUse)
+                                frame.setRsv3(true);
+                            else
+                                throw new ProtocolException("RSV3 not allowed to be set");   
+                        }
                     }
-
+                    else
+                    {
+                        if (LOG.isDebugEnabled())
+                        {
+                            LOG.debug("OpCode {}, fin={} rsv=000",OpCode.name(opcode),fin);
+                        }
+                    }
+                    
                     state = State.PAYLOAD_LEN;
                     break;
                 }
+                
                 case PAYLOAD_LEN:
                 {
                     byte b = buffer.get();
@@ -450,6 +453,7 @@ public class Parser
 
                     break;
                 }
+                
                 case PAYLOAD_LEN_BYTES:
                 {
                     byte b = buffer.get();
@@ -477,6 +481,7 @@ public class Parser
                     }
                     break;
                 }
+                
                 case MASK:
                 {
                     byte m[] = new byte[4];
@@ -501,6 +506,7 @@ public class Parser
                     }
                     break;
                 }
+                
                 case MASK_BYTES:
                 {
                     byte b = buffer.get();
@@ -520,6 +526,7 @@ public class Parser
                     }
                     break;
                 }
+                
                 case PAYLOAD:
                 {
                     if (parsePayload(buffer))
@@ -549,43 +556,45 @@ public class Parser
      * @return true if payload is done reading, false if incomplete
      */
     private boolean parsePayload(ByteBuffer buffer)
-    {
+    {        
         if (payloadLength == 0)
         {
             return true;
         }
 
-        while (buffer.hasRemaining())
+        if (buffer.hasRemaining())
         {
             if (payload == null)
             {
                 frame.assertValid();
                 payload = bufferPool.acquire(payloadLength,false);
-                BufferUtil.clearToFill(payload);
+                BufferUtil.clear(payload);
             }
 
             // Create a small window of the incoming buffer to work with.
             // this should only show the payload itself, and not any more
             // bytes that could belong to the start of the next frame.
             ByteBuffer window = buffer.slice();
-            int bytesExpected = payloadLength - payload.position();
+            int bytesExpected = payloadLength - payload.remaining();
             int bytesAvailable = buffer.remaining();
             int windowBytes = Math.min(bytesAvailable,bytesExpected);
-            window.limit(window.position() + windowBytes);
+            int take = Math.min(windowBytes,payload.capacity()-payload.limit());
+            
+            window.limit(window.position() + take);
 
             if (LOG.isDebugEnabled())
             {
                 LOG.debug("Window: {}",BufferUtil.toDetailString(window));
             }
 
-            maskProcessor.process(window);
-            int len = BufferUtil.put(window,payload);
+            int pos=BufferUtil.flipToFill(payload);
+            maskProcessor.process(window,payload);
+            BufferUtil.flipToFlush(payload,pos);
 
-            buffer.position(buffer.position() + len); // update incoming buffer position
+            buffer.position(buffer.position() + take); // update incoming buffer position
 
-            if (payload.position() >= payloadLength)
+            if (payload.limit() >= payloadLength)
             {
-                BufferUtil.flipToFlush(payload,0);
                 frame.setPayload(payload);
                 this.payload = null;
                 return true;
