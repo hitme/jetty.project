@@ -75,13 +75,18 @@ public class Parser
     private PayloadProcessor maskProcessor = new DeMaskProcessor();
     // private PayloadProcessor strictnessProcessor;
 
-    /** Is there an extension using RSV1 */
-    private boolean rsv1InUse = false;
-    /** Is there an extension using RSV2 */
-    private boolean rsv2InUse = false;
-    /** Is there an extension using RSV3 */
-    private boolean rsv3InUse = false;
-
+    /** 
+     * Is there an extension using RSV flag?
+     * <p>
+     * 
+     * <pre>
+     *   0100_0000 (0x40) = rsv1
+     *   0010_0000 (0x20) = rsv2
+     *   0001_0000 (0x10) = rsv3
+     * </pre>
+     */
+    private byte flagsInUse=0x00;
+    
     private IncomingFrames incomingFramesHandler;
 
     public Parser(WebSocketPolicy wspolicy, ByteBufferPool bufferPool)
@@ -132,24 +137,22 @@ public class Parser
     public void configureFromExtensions(List<? extends Extension> exts)
     {        
         // default
-        this.rsv1InUse = false;
-        this.rsv2InUse = false;
-        this.rsv3InUse = false;
+        flagsInUse = 0x00;
 
         // configure from list of extensions in use
         for (Extension ext : exts)
         {
             if (ext.isRsv1User())
             {
-                this.rsv1InUse = true;
+                flagsInUse = (byte)(flagsInUse | 0x40);
             }
             if (ext.isRsv2User())
             {
-                this.rsv2InUse = true;
+                flagsInUse = (byte)(flagsInUse | 0x20);
             }
             if (ext.isRsv3User())
             {
-                this.rsv3InUse = true;
+                flagsInUse = (byte)(flagsInUse | 0x10);
             }
         }
     }
@@ -166,17 +169,17 @@ public class Parser
 
     public boolean isRsv1InUse()
     {
-        return rsv1InUse;
+        return (flagsInUse & 0x40) != 0;
     }
 
     public boolean isRsv2InUse()
     {
-        return rsv2InUse;
+        return (flagsInUse & 0x20) != 0;
     }
 
     public boolean isRsv3InUse()
     {
-        return rsv3InUse;
+        return (flagsInUse & 0x10) != 0;
     }
 
     protected void notifyFrame(final Frame f)
@@ -306,6 +309,15 @@ public class Parser
                         throw new ProtocolException("Unknown opcode: " + opc);
                     }
                     
+                    if (LOG.isDebugEnabled())
+                    {
+                        LOG.debug("OpCode {}, fin={} rsv={}{}{}",
+                                OpCode.name(opcode),
+                                fin,
+                                (isRsv1InUse()?'1':'.'),
+                                (isRsv2InUse()?'1':'.'),
+                                (isRsv3InUse()?'1':'.'));
+                    }
 
                     // base framing flags
                     switch(opcode) 
@@ -378,21 +390,21 @@ public class Parser
                          */
                         if ((b & 0x40) != 0)
                         {
-                            if (rsv1InUse)
+                            if (isRsv1InUse())
                                 frame.setRsv1(true);
                             else
                                 throw new ProtocolException("RSV1 not allowed to be set");   
                         }
                         if ((b & 0x20) != 0)
                         {
-                            if (rsv2InUse)
+                            if (isRsv2InUse())
                                 frame.setRsv2(true);
                             else
                                 throw new ProtocolException("RSV2 not allowed to be set");   
                         }
                         if ((b & 0x10) != 0)
                         {
-                            if (rsv3InUse)
+                            if (isRsv3InUse())
                                 frame.setRsv3(true);
                             else
                                 throw new ProtocolException("RSV3 not allowed to be set");   

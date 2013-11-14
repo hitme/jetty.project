@@ -64,7 +64,16 @@ public class Generator
     private final ByteBufferPool bufferPool;
     private final boolean validating;
 
-    /** Are any flags in use? */
+    /** 
+     * Are any flags in use
+     * <p>
+     * 
+     * <pre>
+     *   0100_0000 (0x40) = rsv1
+     *   0010_0000 (0x20) = rsv2
+     *   0001_0000 (0x10) = rsv3
+     * </pre>
+     */
     private byte flagsInUse=0x00;
 
     /**
@@ -195,29 +204,26 @@ public class Generator
          */
         byte b = 0x00;
         
-        // Set the flags
-        if (flagsInUse!=0)
-        {
-            if (frame.isRsv1())
-            {
-                b |= 0x40; // 0100_0000
-            }
-            if (frame.isRsv2())
-            {
-                b |= 0x20; // 0010_0000
-            }
-            if (frame.isRsv3())
-            {
-                b |= 0x10; // 0001_0000
-            }
-            b &= flagsInUse;
-        }
-
         // Setup fin thru opcode
         if (frame.isFin())
         {
             b |= 0x80; // 1000_0000
         }
+        
+        // Set the flags
+        if (frame.isRsv1())
+        {
+            b |= 0x40; // 0100_0000
+        }
+        if (frame.isRsv2())
+        {
+            b |= 0x20; // 0010_0000
+        }
+        if (frame.isRsv3())
+        {
+            b |= 0x10; // 0001_0000
+        }
+        
         // NOTE: using .getOpCode() here, not .getType().getOpCode() for testing reasons
         byte opcode = frame.getOpCode();
 
@@ -237,30 +243,10 @@ public class Generator
         // payload lengths
         int payloadLength = frame.getPayloadLength();
 
-
         /*
-         * if length < 126 we have a 7 bit length
+         * if length is over 65535 then its a 7 + 64 bit length
          */
-        if (payloadLength < 0x7E)
-        {
-            b |= (payloadLength & 0x7F);
-            buffer.put(b);
-        }
-        /*
-         * else if payload is < 65536 we have a 7 + 16 bit length
-         */
-        else if (payloadLength < 0x10000 )
-        {
-            b |= 0x7E;
-            buffer.put(b); // indicate 2 byte length
-            buffer.put((byte)(payloadLength >> 8));
-            buffer.put((byte)(payloadLength & 0xFF));
-        }
-
-        /*
-         * else if length is over 65535 then its a 7 + 64 bit length
-         */
-        else if (payloadLength < 0x1_0000_0000L)
+        if (payloadLength > 0xFF_FF)
         {
             // we have a 64 bit length
             b |= 0x7F;
@@ -274,8 +260,24 @@ public class Generator
             buffer.put((byte)((payloadLength >> 8) & 0xFF));
             buffer.put((byte)(payloadLength & 0xFF));
         }
+        /*
+         * if payload is greater that 126 we have a 7 + 16 bit length
+         */
+        else if (payloadLength >= 0x7E )
+        {
+            b |= 0x7E;
+            buffer.put(b); // indicate 2 byte length
+            buffer.put((byte)(payloadLength >> 8));
+            buffer.put((byte)(payloadLength & 0xFF));
+        }
+        /*
+         * we have a 7 bit length
+         */
         else
-            throw new UnsupportedOperationException("Length too large");
+        {
+            b |= (payloadLength & 0x7F);
+            buffer.put(b);
+        }
 
         // masking key
         if (frame.isMasked())
@@ -368,26 +370,17 @@ public class Generator
 
     public void setRsv1InUse(boolean rsv1InUse)
     {
-        if (rsv1InUse)
-            flagsInUse = (byte)(flagsInUse | 0x40);
-        else
-            flagsInUse = (byte)(flagsInUse & 0x30);
+        flagsInUse = (byte)((flagsInUse & 0xBF) | (rsv1InUse?0x40:0x00));
     }
 
     public void setRsv2InUse(boolean rsv2InUse)
     {
-        if (rsv2InUse)
-            flagsInUse = (byte)(flagsInUse | 0x20);
-        else
-            flagsInUse = (byte)(flagsInUse & 0x50);
+        flagsInUse = (byte)((flagsInUse & 0xDF) | (rsv2InUse?0x20:0x00));
     }
 
     public void setRsv3InUse(boolean rsv3InUse)
     {
-        if (rsv3InUse)
-            flagsInUse = (byte)(flagsInUse | 0x10);
-        else
-            flagsInUse = (byte)(flagsInUse & 0x60);
+        flagsInUse = (byte)((flagsInUse & 0xEF) | (rsv3InUse?0x10:0x00));
     }
 
     public boolean isRsv1InUse()
