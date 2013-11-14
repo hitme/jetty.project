@@ -20,6 +20,7 @@ package org.eclipse.jetty.websocket.common.io.payload;
 
 import java.nio.ByteBuffer;
 
+import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.websocket.api.extensions.Frame;
 
 public class DeMaskProcessor implements PayloadProcessor
@@ -28,33 +29,42 @@ public class DeMaskProcessor implements PayloadProcessor
     private int maskOffset;
 
     @Override
-    public void process(ByteBuffer payload)
+    public void process(ByteBuffer payload, ByteBuffer destination)
     {
         if (maskBytes == null)
         {
+            if (payload!=destination)
+                BufferUtil.put(payload,destination);
             return;
         }
 
         int maskInt = ByteBuffer.wrap(maskBytes).getInt();
-        int start = payload.position();
+        int from = payload.position();
+        int to = destination.position();
         int end = payload.limit();
         int offset = this.maskOffset;
         int remaining;
-        while ((remaining = end - start) > 0)
+        while ((remaining = end - from) > 0)
         {
             if (remaining >= 4 && (offset % 4) == 0)
             {
-                payload.putInt(start,payload.getInt(start) ^ maskInt);
-                start += 4;
+                destination.putInt(to,payload.getInt(from) ^ maskInt);
+                from += 4;
+                to += 4;
                 offset += 4;
             }
             else
             {
-                payload.put(start,(byte)(payload.get(start) ^ maskBytes[offset & 3]));
-                ++start;
+                destination.put(to,(byte)(payload.get(from) ^ maskBytes[offset & 3]));
+                ++from;
+                ++to;
                 ++offset;
             }
         }
+        
+        if (payload!=destination)
+            destination.position(destination.position()+payload.remaining());
+        
         maskOffset = offset;
     }
 
