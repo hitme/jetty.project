@@ -270,6 +270,7 @@ public class FrameFlusher
                 {
                     i.remove();
                     frame.notifySucceeded();
+                    frame.freeBuffers();
                 }
             }
             super.succeeded();
@@ -279,7 +280,10 @@ public class FrameFlusher
         public void failed(Throwable x)
         {
             for (FrameEntry frame : active)
+            {
                 frame.notifyFailed(x);
+                frame.freeBuffers();
+            }
             active.clear();
             super.failed(x);
         }
