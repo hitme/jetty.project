@@ -43,7 +43,7 @@ import org.eclipse.jetty.websocket.common.frames.DataFrame;
  */
 public class WriteBytesProvider implements Callback
 {
-    private class FrameEntry implements Callback
+    private class FrameEntry 
     {
         protected final AtomicBoolean failed = new AtomicBoolean(false);
         protected final Frame frame;
@@ -70,8 +70,7 @@ public class WriteBytesProvider implements Callback
             return generator.getPayloadWindow(bufferSize,frame);
         }
 
-        @Override
-        public void failed(Throwable t)
+        public void notifyFailed(Throwable t)
         {
             freeBuffers();
             if (failed.getAndSet(true) == false)
@@ -80,8 +79,7 @@ public class WriteBytesProvider implements Callback
             }
         }
 
-        @Override
-        public void succeeded()
+        public void notifySucceeded()
         {
             freeBuffers();
             if (callback == null)
@@ -243,7 +241,7 @@ public class WriteBytesProvider implements Callback
             // notify entry callbacks
             for (FrameEntry entry : callbacks)
             {
-                entry.failed(t);
+                entry.notifyFailed(t);
             }
         }
     }
@@ -407,7 +405,7 @@ public class WriteBytesProvider implements Callback
         // notify entry callbacks outside of synchronize
         for (FrameEntry entry : callbacks)
         {
-            entry.succeeded();
+            entry.notifySucceeded();
         }
     }
 
