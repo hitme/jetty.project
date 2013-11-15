@@ -153,7 +153,6 @@ public class FrameFlusher
                 failure=this.failure;
             }
 
-
             switch (frame.getOpCode())
             {
                 case OpCode.PING:
@@ -254,7 +253,6 @@ public class FrameFlusher
             if (buffers.size()==0)
                 return State.IDLE;
             
-            // TODO write the buffers somewhere
             endpoint.write(this,buffers.toArray(new ByteBuffer[buffers.size()]));
             buffers.clear();
             return State.SCHEDULED;
