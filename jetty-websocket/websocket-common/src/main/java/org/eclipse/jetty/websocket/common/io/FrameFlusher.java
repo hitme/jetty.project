@@ -305,12 +305,19 @@ public class FrameFlusher
         @Override
         public void failed(Throwable x)
         {
-            for (FrameEntry frame : active)
+            synchronized (lock)
+            {
+                done.addAll(active);
+                active.clear();
+            }
+
+            for (FrameEntry frame : done)
             {
                 frame.notifyFailed(x);
                 frame.freeBuffers();
             }
-            active.clear();
+            done.clear();
+            
             super.failed(x);
             onFailure(x);
         }
