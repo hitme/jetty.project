@@ -234,11 +234,7 @@ public class Flusher
         @Override
         public void failed(Throwable x)
         {
-            for (FrameBytes frame: active)
-                frame.failed(x);
-            active.clear();
-            
-            List<StandardSession.FrameBytes> frameBytesToFail = new ArrayList<>();
+            List<StandardSession.FrameBytes> failed = new ArrayList<>();
             synchronized (lock)
             {
                 failure = x;
@@ -247,10 +243,12 @@ public class Flusher
                     String logMessage = String.format("Failed write of %s, failing all %d frame(s) in queue", this, queue.size());
                     LOG.debug(logMessage, x);
                 }
-                frameBytesToFail.addAll(queue);
+                failed.addAll(active);
+                active.clear();
+                failed.addAll(queue);
                 queue.clear();
             }
-            for (StandardSession.FrameBytes fb : frameBytesToFail)
+            for (StandardSession.FrameBytes fb : failed)
                 fb.failed(x);
             super.failed(x);
         }
