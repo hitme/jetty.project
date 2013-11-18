@@ -106,17 +106,18 @@ public class FrameFlusher
      */
     public void close()
     {
-        LOG.debug(".close()");
-        
         synchronized (lock)
         {
-            closed=true;
-            
-            EOFException eof = new EOFException("Connection has been disconnected");
-            flusherCB.failed(eof);
-            for (FrameEntry frame : queue)
-                frame.notifyFailed(eof);
-            queue.clear();
+            if (!closed)
+            {
+                closed=true;
+
+                EOFException eof = new EOFException("Connection has been disconnected");
+                flusherCB.failed(eof);
+                for (FrameEntry frame : queue)
+                    frame.notifyFailed(eof);
+                queue.clear();
+            }
         }
         
     }
@@ -183,8 +184,10 @@ public class FrameFlusher
         flusherCB.iterate();
     }
     
-    
-
+    protected void onFailure(Throwable x)
+    {
+        LOG.warn(x);
+    }
 
     @Override
     public String toString()
@@ -193,12 +196,12 @@ public class FrameFlusher
         b.append("WriteBytesProvider[");
         if (failure != null)
         {
-            b.append(",failure=").append(failure.getClass().getName());
-            b.append(":").append(failure.getMessage());
+            b.append("failure=").append(failure.getClass().getName());
+            b.append(":").append(failure.getMessage()).append(',');
         }
         else
         {
-            b.append(",queue.size=").append(queue.size());
+            b.append("queue.size=").append(queue.size());
         }
         b.append(']');
         return b.toString();
@@ -208,6 +211,7 @@ public class FrameFlusher
     {
         private final ArrayQueue<FrameEntry> active = new ArrayQueue<>(lock);
         private final List<ByteBuffer> buffers = new ArrayList<>();
+        private final List<FrameEntry> done = new ArrayList<>();
         
         @Override
         protected void completed()
@@ -224,23 +228,39 @@ public class FrameFlusher
                 if (buffers.size()>0)
                     throw new IllegalStateException();
                 
-                // Do we have any active, not done frames?
-                aLoop: for (FrameEntry frame:active)
+                // Process existing active list, which will contain
+                // frames that are done (thus will have been completely written by
+                // prior call to process) and frames that are not done (thus needing 
+                // more buffers to be gathered from them and written
+                aLoop: for (Iterator<FrameEntry> i=active.iterator();i.hasNext();)
                 {
-                    while (!frame.isDone())
+                    FrameEntry frame = i.next();
+                    if (frame.isDone())
                     {
-                        buffers.add(frame.getPayloadWindow());
-                        if (buffers.size()>=gatheredBufferLimit)
-                            break aLoop;
+                        i.remove();
+                        done.add(frame);
+                    }
+                    else
+                    {
+                        while (!frame.isDone())
+                        {
+                            buffers.add(frame.getPayloadWindow());
+                            if (buffers.size()>=gatheredBufferLimit)
+                                break aLoop;
+                        }
                     }
                 }
                 
-                // can we fit some more active buffers
+                // If we exited the loop above without hitting the gatheredBufferLimit
+                // then all the active frames are done, so we can add some more.
                 qLoop: while (buffers.size()<gatheredBufferLimit && !queue.isEmpty())
                 {
                     FrameEntry frame = queue.remove(0);
+                    active.add(frame);
                     buffers.add(frame.getHeaderBytes());
 
+                    // We have to completely add a frame before considering gathering another
+                    // active frame
                     while (!frame.isDone())
                     {
                         buffers.add(frame.getPayloadWindow());
@@ -248,30 +268,23 @@ public class FrameFlusher
                             break qLoop;
                     }
                 }
+                
+                if (LOG.isDebugEnabled())
+                    LOG.debug("process {} active={} buffers={}",FrameFlusher.this,active,buffers);
+            }
+            
+            for (FrameEntry frame:done)
+            {
+                frame.notifySucceeded();
+                frame.freeBuffers();
             }
             
             if (buffers.size()==0)
                 return State.IDLE;
-            
+
             endpoint.write(this,buffers.toArray(new ByteBuffer[buffers.size()]));
             buffers.clear();
             return State.SCHEDULED;
-        }
-
-        @Override
-        public void succeeded()
-        {
-            for (Iterator<FrameEntry> i=active.iterator();i.hasNext();)
-            {
-                FrameEntry frame = i.next();
-                if (frame.isDone())
-                {
-                    i.remove();
-                    frame.notifySucceeded();
-                    frame.freeBuffers();
-                }
-            }
-            super.succeeded();
         }
 
         @Override
@@ -284,6 +297,7 @@ public class FrameFlusher
             }
             active.clear();
             super.failed(x);
+            onFailure(x);
         }
     }
 
@@ -378,6 +392,11 @@ public class FrameFlusher
         public boolean isDone()
         {
             return frame.remaining() <= 0;
+        }
+        
+        public String toString()
+        {
+            return "["+callback+","+frame+","+failure+"]";
         }
     }
 }
