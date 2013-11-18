@@ -225,29 +225,18 @@ public class FrameFlusher
         {
             synchronized (lock)
             {
-                if (buffers.size()>0)
-                    throw new IllegalStateException();
+                done.clear();
                 
-                // Process existing active list, which will contain
-                // frames that are done (thus will have been completely written by
-                // prior call to process) and frames that are not done (thus needing 
+                // Process existing active list, which may contain
+                // frames that are not done (thus needing 
                 // more buffers to be gathered from them and written
-                aLoop: for (Iterator<FrameEntry> i=active.iterator();i.hasNext();)
+                aLoop: for (FrameEntry frame : active)
                 {
-                    FrameEntry frame = i.next();
-                    if (frame.isDone())
+                    while (!frame.isDone())
                     {
-                        i.remove();
-                        done.add(frame);
-                    }
-                    else
-                    {
-                        while (!frame.isDone())
-                        {
-                            buffers.add(frame.getPayloadWindow());
-                            if (buffers.size()>=gatheredBufferLimit)
-                                break aLoop;
-                        }
+                        buffers.add(frame.getPayloadWindow());
+                        if (buffers.size()>=gatheredBufferLimit)
+                            break aLoop;
                     }
                 }
                 
@@ -273,12 +262,6 @@ public class FrameFlusher
                     LOG.debug("process {} active={} buffers={}",FrameFlusher.this,active,buffers);
             }
             
-            for (FrameEntry frame:done)
-            {
-                frame.notifySucceeded();
-                frame.freeBuffers();
-            }
-            
             if (buffers.size()==0)
                 return State.IDLE;
 
@@ -286,6 +269,38 @@ public class FrameFlusher
             buffers.clear();
             return State.SCHEDULED;
         }
+
+        @Override
+        public void succeeded()
+        { 
+            synchronized (lock)
+            {
+                // Process existing active list, which will contain
+                // frames that are done (thus will have been completely written by
+                // prior call to process) and frames that are not done (thus needing 
+                // more processing).
+                for (Iterator<FrameEntry> i=active.iterator();i.hasNext();)
+                {
+                    FrameEntry frame = i.next();
+                    if (frame.isDone())
+                    {
+                        i.remove();
+                        done.add(frame);
+                        continue;
+                    }
+                    break;
+                }
+            }
+            
+            for (FrameEntry frame:done)
+            {
+                frame.notifySucceeded();
+                frame.freeBuffers();
+            }
+            
+            super.succeeded();
+        }
+        
 
         @Override
         public void failed(Throwable x)

@@ -138,6 +138,7 @@ public class Flusher
     private class FlusherCB extends IteratingCallback
     {
         private final List<StandardSession.FrameBytes> active = new ArrayList<>();
+        private final List<StandardSession.FrameBytes> succeeded = new ArrayList<>();
         private final Set<IStream> stalled = new HashSet<>();
         
         @Override
@@ -145,12 +146,8 @@ public class Flusher
         {
             synchronized (lock)
             {
-                if (active.size()>0)
-                    throw new IllegalStateException();
+                succeeded.clear();
                 
-                if (queue.isEmpty())
-                    return State.IDLE;
-
                 // Scan queue for data to write from first non stalled stream. 
                 int qs=queue.size();
                 for (int i = 0; i < qs && active.size()<MAX_GATHER;)
@@ -218,16 +215,15 @@ public class Flusher
         @Override
         public void succeeded()
         {
-            if (LOG.isDebugEnabled())
+            synchronized (lock)
             {
-                synchronized (lock)
-                {
-                    LOG.debug("Completed write of {}, {} frame(s) in queue", active, queue.size());
-                }
+                if (LOG.isDebugEnabled())
+                    LOG.debug("Succeeded write of {}, q={}", active, queue.size());
+                succeeded.addAll(active);
+                active.clear();
             }
-            for (FrameBytes frame: active)
+            for (FrameBytes frame: succeeded)
                 frame.succeeded();
-            active.clear();
             super.succeeded();
         }
 
