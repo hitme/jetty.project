@@ -22,7 +22,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -211,7 +210,7 @@ public class FrameFlusher
     {
         private final ArrayQueue<FrameEntry> active = new ArrayQueue<>(lock);
         private final List<ByteBuffer> buffers = new ArrayList<>();
-        private final List<FrameEntry> done = new ArrayList<>();
+        private final List<FrameEntry> succeeded = new ArrayList<>();
         
         @Override
         protected void completed()
@@ -225,37 +224,20 @@ public class FrameFlusher
         {
             synchronized (lock)
             {
-                done.clear();
+                succeeded.clear();
                 
-                // Process existing active list, which may contain
-                // frames that are not done (thus needing 
-                // more buffers to be gathered from them and written
-                aLoop: for (FrameEntry frame : active)
-                {
-                    while (!frame.isDone())
-                    {
-                        buffers.add(frame.getPayloadWindow());
-                        if (buffers.size()>=gatheredBufferLimit)
-                            break aLoop;
-                    }
-                }
                 
                 // If we exited the loop above without hitting the gatheredBufferLimit
                 // then all the active frames are done, so we can add some more.
-                qLoop: while (buffers.size()<gatheredBufferLimit && !queue.isEmpty())
+                while (buffers.size()<gatheredBufferLimit && !queue.isEmpty())
                 {
                     FrameEntry frame = queue.remove(0);
                     active.add(frame);
                     buffers.add(frame.getHeaderBytes());
 
-                    // We have to completely add a frame before considering gathering another
-                    // active frame
-                    while (!frame.isDone())
-                    {
-                        buffers.add(frame.getPayloadWindow());
-                        if (buffers.size()>=gatheredBufferLimit)
-                            break qLoop;
-                    }
+                    ByteBuffer payload = frame.getPayload();
+                    if (payload!=null)
+                        buffers.add(payload);
                 }
                 
                 if (LOG.isDebugEnabled())
@@ -275,24 +257,11 @@ public class FrameFlusher
         { 
             synchronized (lock)
             {
-                // Process existing active list, which will contain
-                // frames that are done (thus will have been completely written by
-                // prior call to process) and frames that are not done (thus needing 
-                // more processing).
-                for (Iterator<FrameEntry> i=active.iterator();i.hasNext();)
-                {
-                    FrameEntry frame = i.next();
-                    if (frame.isDone())
-                    {
-                        i.remove();
-                        done.add(frame);
-                        continue;
-                    }
-                    break;
-                }
+                succeeded.addAll(active);
+                active.clear();
             }
             
-            for (FrameEntry frame:done)
+            for (FrameEntry frame:succeeded)
             {
                 frame.notifySucceeded();
                 frame.freeBuffers();
@@ -307,16 +276,16 @@ public class FrameFlusher
         {
             synchronized (lock)
             {
-                done.addAll(active);
+                succeeded.addAll(active);
                 active.clear();
             }
 
-            for (FrameEntry frame : done)
+            for (FrameEntry frame : succeeded)
             {
                 frame.notifyFailed(x);
                 frame.freeBuffers();
             }
-            done.clear();
+            succeeded.clear();
             
             super.failed(x);
             onFailure(x);
@@ -344,10 +313,10 @@ public class FrameFlusher
             return buf;
         }
 
-        public ByteBuffer getPayloadWindow()
+        public ByteBuffer getPayload()
         {
             // There is no need to release this ByteBuffer, as it is just a slice of the user provided payload
-            return generator.getPayloadWindow(bufferSize,frame);
+            return frame.getPayload();
         }
 
         public void notifyFailed(Throwable t)
@@ -399,23 +368,12 @@ public class FrameFlusher
 
             if (frame instanceof DataFrame)
             {
+                // TODO null payload within frame
                 DataFrame data = (DataFrame)frame;
-                if (data.isPooledBuffer())
-                {
-                    ByteBuffer payload = frame.getPayload();
-                    generator.getBufferPool().release(payload);
-                }
+                data.releaseBuffer();
             }
         }
 
-        /**
-         * Indicate that the frame entry is done generating
-         */
-        public boolean isDone()
-        {
-            return frame.remaining() <= 0;
-        }
-        
         public String toString()
         {
             return "["+callback+","+frame+","+failure+"]";

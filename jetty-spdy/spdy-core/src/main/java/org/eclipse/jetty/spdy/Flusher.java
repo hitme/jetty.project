@@ -137,6 +137,7 @@ public class Flusher
 
     private class FlusherCB extends IteratingCallback
     {
+        // TODO should active and succeeded be local?
         private final List<StandardSession.FrameBytes> active = new ArrayList<>();
         private final List<StandardSession.FrameBytes> succeeded = new ArrayList<>();
         private final Set<IStream> stalled = new HashSet<>();
@@ -223,7 +224,7 @@ public class Flusher
                 active.clear();
             }
             for (FrameBytes frame: succeeded)
-                frame.succeeded();
+                frame.succeeded(); // TODO should we try catch?
             super.succeeded();
         }
 
@@ -245,7 +246,7 @@ public class Flusher
                 queue.clear();
             }
             for (StandardSession.FrameBytes fb : failed)
-                fb.failed(x);
+                fb.failed(x);  // TODO should we try catch?
             super.failed(x);
         }
     }
