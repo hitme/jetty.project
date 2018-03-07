@@ -122,7 +122,7 @@ public class HandlerCollection extends AbstractHandlerContainer
             for (int i=0;i<_handlers.length;i++)
             {
                 try
-                {
+                {//[tzl]: loop through handlers process requests
                     _handlers[i].handle(target,baseRequest, request, response);
                 }
                 catch(IOException e)

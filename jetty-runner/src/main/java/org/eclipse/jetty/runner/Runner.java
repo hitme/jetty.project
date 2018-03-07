@@ -359,7 +359,7 @@ public class Runner
                                 statsHandler.setHandler(oldHandler);
                                 _server.setHandler(statsHandler);
 
-
+                                // [tzl]: sample servlet
                                 ServletContextHandler statsContext = new ServletContextHandler(_contexts, "/stats");
                                 statsContext.addServlet(new ServletHolder(new StatisticsServlet()), "/");
                                 statsContext.setSessionHandler(new SessionHandler());
@@ -568,7 +568,7 @@ public class Runner
             else
             {
                 runner.configure(args);
-                runner.run();
+                runner.run();//[tzl]: jetty runner main entry
             }
         }
         catch (Exception e)
