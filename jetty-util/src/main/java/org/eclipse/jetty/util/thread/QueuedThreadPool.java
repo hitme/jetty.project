@@ -623,7 +623,7 @@ public class QueuedThreadPool extends AbstractLifeCycle implements SizedThreadPo
                     {
                         if (LOG.isDebugEnabled())
                             LOG.debug("run {}",job);
-                        runJob(job);
+                        runJob(job);// [tzl]: run added runnable
                         if (LOG.isDebugEnabled())
                             LOG.debug("ran {}",job);
                         if (Thread.interrupted())

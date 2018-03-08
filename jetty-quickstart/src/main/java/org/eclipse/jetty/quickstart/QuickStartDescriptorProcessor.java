@@ -181,7 +181,7 @@ public class QuickStartDescriptorProcessor extends IterativeDescriptorProcessor
                 
             case AnnotationConfiguration.CONTAINER_INITIALIZERS:
             {
-                for (String i : values)
+                for (String i : values)//[tzl]: add containerInitializers
                     visitContainerInitializer(context, new ContainerInitializer(Thread.currentThread().getContextClassLoader(), i));
                 break;
             }

@@ -76,7 +76,7 @@ public class ManagedSelector extends ContainerLifeCycle implements Dumpable
         _id = id;
         SelectorProducer producer = new SelectorProducer();
         Executor executor = selectorManager.getExecutor();
-        _strategy = new EatWhatYouKill(producer,executor,_selectorManager.getBean(ReservedThreadExecutor.class));
+        _strategy = new EatWhatYouKill(producer,executor,_selectorManager.getBean(ReservedThreadExecutor.class));// [tzl]: wrapper for SelectorProducer
         addBean(_strategy,true);
         setStopTimeout(5000);
     }
@@ -98,7 +98,7 @@ public class ManagedSelector extends ContainerLifeCycle implements Dumpable
 
         // The normal strategy obtains the produced task, schedules
         // a new thread to produce more, runs the task and then exits.
-        _selectorManager.execute(_strategy::produce);
+        _selectorManager.execute(_strategy::produce);// [tzl]: execute various tasks (selector status callbacks)
     }
 
     public int size()
@@ -289,7 +289,7 @@ public class ManagedSelector extends ContainerLifeCycle implements Dumpable
         @Override
         public Runnable produce()
         {
-            while (true)
+            while (true)// [tzl]: the reactor pattern, selecting done in select()
             {
                 Runnable task = processSelected();
                 if (task != null)

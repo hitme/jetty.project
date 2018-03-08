@@ -527,7 +527,7 @@ public class Runner
 
     public void run() throws Exception
     {
-        _server.start();
+        _server.start();//[tzl]: server lifecycle
         _server.join();
     }
 

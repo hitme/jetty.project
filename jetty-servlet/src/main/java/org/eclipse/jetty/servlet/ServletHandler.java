@@ -737,7 +737,7 @@ public class ServletHandler extends ScopedHandler
             {
                 try
                 {
-                    f.start();
+                    f.start();//[tzl]: lifecycle of filter holders
                     f.initialize();
                 }
                 catch (Exception e)
@@ -756,7 +756,7 @@ public class ServletHandler extends ScopedHandler
             {
                 try
                 {
-                    servlet.start();
+                    servlet.start();//[tzl]: lifecycle of servlet holders
                     servlet.initialize();
                 }
                 catch (Throwable e)

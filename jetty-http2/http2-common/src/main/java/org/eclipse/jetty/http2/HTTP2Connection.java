@@ -202,8 +202,8 @@ public class HTTP2Connection extends AbstractConnection
                 if (looping)
                 {
                     while (buffer.hasRemaining())
-                        parser.parse(buffer);
-
+                        parser.parse(buffer);// [tzl]: Parser#parse->HearderBodyParser#notifyHeaders
+//->HTTP2ServerSession#onHeaders->..HTTPServerSessionListener#onNewStream..->HttpChannel#run->..HttpChannel#handle..->Server#handle
                     task = pollTask();
                     if (LOG.isDebugEnabled())
                         LOG.debug("Dequeued new task {}", task);

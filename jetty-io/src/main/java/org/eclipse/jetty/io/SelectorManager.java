@@ -215,7 +215,7 @@ public abstract class SelectorManager extends ContainerLifeCycle implements Dump
      * <p>This method is called just after a channel has been accepted by {@link ServerSocketChannel#accept()},
      * or just after having performed a blocking connect via {@link Socket#connect(SocketAddress, int)}, or
      * just after a non-blocking connect via {@link SocketChannel#connect(SocketAddress)} that completed
-     * successfully.</p>
+     * successfully.</p>[tzl]: ready to transfer data
      *
      * @param channel    the channel to register
      * @param attachment the attachment object

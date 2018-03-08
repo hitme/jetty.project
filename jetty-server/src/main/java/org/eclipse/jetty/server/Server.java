@@ -394,7 +394,7 @@ public class Server extends HandlerWrapper implements Attributes
         {
             try
             {
-                connector.start();
+                connector.start();//[tzl]: lifecycle of connectors
             }
             catch(Throwable e)
             {
@@ -524,10 +524,10 @@ public class Server extends HandlerWrapper implements Attributes
                 response.sendError(HttpStatus.BAD_REQUEST_400);
             handleOptions(request,response);
             if (!request.isHandled())
-                handle(target, request, request, response);
+                handle(target, request, request, response);//[tzl]: fire handler chain
         }
         else
-            handle(target, request, request, response);
+            handle(target, request, request, response);//[tzl]: fire handler chain
 
         if (LOG.isDebugEnabled())
             LOG.debug("handled={} async={} committed={} on {}", request.isHandled(),request.isAsyncStarted(),response.isCommitted(),channel);
@@ -572,7 +572,7 @@ public class Server extends HandlerWrapper implements Attributes
 
         if (LOG.isDebugEnabled())
             LOG.debug("{} {} {} on {}", request.getDispatcherType(), request.getMethod(), target, channel);
-        handle(target, baseRequest, request, response);
+        handle(target, baseRequest, request, response);//[tzl]: fire handler chain
         if (LOG.isDebugEnabled())
             LOG.debug("handledAsync={} async={} committed={} on {}", channel.getRequest().isHandled(),request.isAsyncStarted(),response.isCommitted(),channel);
     }

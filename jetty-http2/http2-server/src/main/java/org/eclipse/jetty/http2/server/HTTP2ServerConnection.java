@@ -163,7 +163,7 @@ public class HTTP2ServerConnection extends HTTP2Connection implements Connection
         if (LOG.isDebugEnabled())
             LOG.debug("Processing {} on {}", frame, stream);
         HttpChannelOverHTTP2 channel = provideHttpChannel(connector, stream);
-        Runnable task = channel.onRequest(frame);
+        Runnable task = channel.onRequest(frame);// ..->HttpChannel#run->..HttpChannel#handle..->Server#handle
         if (task != null)
             offerTask(task, false);
     }

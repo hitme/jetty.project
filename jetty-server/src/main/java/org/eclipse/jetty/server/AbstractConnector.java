@@ -282,7 +282,7 @@ public abstract class AbstractConnector extends ContainerLifeCycle implements Co
         {
             Acceptor a = new Acceptor(i);
             addBean(a);
-            getExecutor().execute(a);
+            getExecutor().execute(a);//[tzl]: run acceptors
         }
 
         LOG.info("Started {}", this);

@@ -386,7 +386,7 @@ public class ServerConnector extends AbstractNetworkConnector
         channel.configureBlocking(false);
         Socket socket = channel.socket();
         configure(socket);
-        _manager.accept(channel);
+        _manager.accept(channel);// [tzl]: pass control to selector
     }
 
     protected void configure(Socket socket)

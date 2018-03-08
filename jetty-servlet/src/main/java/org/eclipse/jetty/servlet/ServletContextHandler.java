@@ -326,7 +326,7 @@ public class ServletContextHandler extends ContextHandler
     {
         ServletContainerInitializerCaller sciBean = getBean(ServletContainerInitializerCaller.class);
         if (sciBean!=null)
-            sciBean.start();
+            sciBean.start();//[tzl]: start all ServletContainerInitializers
 
         if (_servletHandler != null)
         {
