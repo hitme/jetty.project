@@ -253,7 +253,7 @@ public class HttpConnection extends AbstractConnection implements Runnable, Http
                 // Handle channel event
                 if (handle)
                 {
-                    boolean suspended = !_channel.handle();
+                    boolean suspended = !_channel.handle();//[tzl]: about to transfer to handlers
 
                     // We should break iteration if we have suspended or changed connection or this is not the handling thread.
                     if (suspended || getEndPoint().getConnection() != this)
@@ -501,7 +501,7 @@ public class HttpConnection extends AbstractConnection implements Runnable, Http
     @Override
     public void run()
     {
-        onFillable();
+        onFillable();// [tzl]: start http processing
     }
 
     @Override

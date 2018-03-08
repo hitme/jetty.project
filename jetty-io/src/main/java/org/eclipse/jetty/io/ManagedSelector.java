@@ -205,9 +205,9 @@ public class ManagedSelector extends ContainerLifeCycle implements Dumpable
     private void createEndPoint(SelectableChannel channel, SelectionKey selectionKey) throws IOException
     {
         EndPoint endPoint = _selectorManager.newEndPoint(channel, this, selectionKey);
-        Connection connection = _selectorManager.newConnection(channel, endPoint, selectionKey.attachment());
+        Connection connection = _selectorManager.newConnection(channel, endPoint, selectionKey.attachment());//[tzl]: connection jumps in
         endPoint.setConnection(connection);
-        selectionKey.attach(endPoint);
+        selectionKey.attach(endPoint);// [tzl]: no return pass data between threads via SelectionKey
         endPoint.onOpen();
         _selectorManager.endPointOpened(endPoint);
         _selectorManager.connectionOpened(connection);
@@ -545,7 +545,7 @@ public class ManagedSelector extends ContainerLifeCycle implements Dumpable
             {
                 if (_key==null)
                 {
-                    _key = _channel.register(_selector, SelectionKey.OP_ACCEPT, this);
+                    _key = _channel.register(_selector, SelectionKey.OP_ACCEPT, this);//[tzl]: attach Acceptor to SelectionKey
                 }     
 
                 if (LOG.isDebugEnabled())
@@ -689,7 +689,7 @@ public class ManagedSelector extends ContainerLifeCycle implements Dumpable
         {
             try
             {
-                channel.register(_selector, SelectionKey.OP_CONNECT, this);
+                channel.register(_selector, SelectionKey.OP_CONNECT, this);// [tzl]: attach Connect to SelectionKey
             }
             catch (Throwable x)
             {
